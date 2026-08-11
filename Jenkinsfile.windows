@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+
+    tools {
+        jdk 'JDK17'
+        maven 'Maven3'
+    }
+
+    parameters {
+        choice(name: 'ENV', choices: ['qa', 'dev'], description: 'Environment')
+        choice(name: 'TEST_GROUP', choices: ['all', 'smoke', 'regression'], description: 'TestNG group')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Verify Tools') {
+            steps {
+                bat 'java -version'
+                bat 'mvn -version'
+            }
+        }
+
+        stage('Run API Tests') {
+            steps {
+                script {
+                    if (params.TEST_GROUP == 'all') {
+                        bat "mvn clean test -Denv=${params.ENV}"
+                    } else {
+                        bat "mvn clean test -Denv=${params.ENV} -Dgroups=${params.TEST_GROUP}"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            junit testResults: 'target/surefire-reports/junitreports/*.xml',
+                  allowEmptyResults: true
+
+            archiveArtifacts artifacts: 'target/surefire-reports/**',
+                             allowEmptyArchive: true
+        }
+    }
+}
